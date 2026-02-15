@@ -47,9 +47,10 @@ INSTALLED_APPS = [
 # =====================================================
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',   # MUST BE FIRST
+
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',   # Required for production
-    'corsheaders.middleware.CorsMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -58,6 +59,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
 
 ROOT_URLCONF = 'core.urls'
 
@@ -162,7 +164,12 @@ AUTH_USER_MODEL = 'users.User'
 # CORS (Allow frontend requests)
 # =====================================================
 
-CORS_ALLOW_ALL_ORIGINS = True   # Restrict later in production
+CORS_ALLOW_ALL_ORIGINS = False   # Turn this off when using specific origins
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5175",
+    "https://vaani-backend-0mxc.onrender.com",
+]
 
 # =====================================================
 # LOGGING
