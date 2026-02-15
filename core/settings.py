@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'chatbot',
     'news',
     'notifications',
+
+    'users',
 ]
 
 # =====================================================

@@ -16,6 +16,7 @@ urlpatterns = [
     path('api/news/', include('news.urls')),
 
     path('api/schemes/', include('schemes.urls')),
+    path('api/users/', include('users.urls')), 
     # JWT Authentication
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
