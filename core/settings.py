@@ -168,6 +168,9 @@ CORS_ALLOW_ALL_ORIGINS = False   # Turn this off when using specific origins
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5175",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "https://vaani-frontend-f8mzt49tf-anurags-projects-7f0cbe34.vercel.app",
     "https://vaani-backend-0mxc.onrender.com",
 ]
 
