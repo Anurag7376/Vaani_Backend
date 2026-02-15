@@ -1,3 +1,6 @@
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view
+import logging
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -6,6 +9,9 @@ from django.core.cache import cache
 from schemes.services.recommender import recommend_schemes
 from chatbot.services.gemini_service import generate_ai_response
 from chatbot.models import ChatMessage
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 
 class ChatView(APIView):
@@ -18,10 +24,18 @@ class ChatView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
+        # Validate input
         message = request.data.get("message")
 
-        if not message:
-            return Response({"error": "Message is required"}, status=400)
+        if not message or not str(message).strip():
+            logger.warning("Empty message received in chat request")
+            return Response(
+                {"error": "Message is required"},
+                status=400
+            )
+
+        # Sanitize message
+        message = str(message).strip()
 
         user = request.user if request.user.is_authenticated else None
 
@@ -36,20 +50,36 @@ class ChatView(APIView):
             if cached_response:
                 return Response({"reply": cached_response})
 
-            # Get AI recommendation
-            reply = recommend_schemes(user, message)
+            try:
+                # Get AI recommendation
+                reply = recommend_schemes(user, message)
 
-            # Save chat history in DB
-            ChatMessage.objects.create(
-                user=user,
-                message=message,
-                response=reply
-            )
+                # Validate response
+                if not reply or not str(reply).strip():
+                    logger.warning(
+                        "Empty response from recommendation service")
+                    reply = "I couldn't generate a response. Please try again."
+                else:
+                    reply = str(reply).strip()
 
-            # Cache for 1 hour
-            cache.set(cache_key, reply, timeout=3600)
+                # Save chat history in DB
+                ChatMessage.objects.create(
+                    user=user,
+                    message=message,
+                    response=reply
+                )
 
-            return Response({"reply": reply})
+                # Cache for 1 hour
+                cache.set(cache_key, reply, timeout=3600)
+
+                return Response({"reply": reply})
+
+            except Exception as e:
+                logger.error(f"Error in recommendation service: {str(e)}")
+                return Response(
+                    {"error": "Service temporarily unavailable"},
+                    status=500
+                )
 
         # ====================================================
         # CASE 2: ANONYMOUS USER → SESSION-BASED AI CHAT
@@ -81,27 +111,41 @@ Conversation so far:
 Continue the conversation naturally.
 """
 
-            reply = generate_ai_response(prompt)
+            try:
+                reply = generate_ai_response(prompt)
 
-            # Append AI reply
-            chat_history.append({
-                "role": "assistant",
-                "content": reply
-            })
+                # Validate response
+                if not reply or not str(reply).strip():
+                    logger.warning("Empty response from Gemini service")
+                    reply = "I couldn't generate a response. Please try again."
+                else:
+                    reply = str(reply).strip()
 
-            # Save back to session
-            request.session["chat_history"] = chat_history
+                # Append AI reply
+                chat_history.append({
+                    "role": "assistant",
+                    "content": reply
+                })
 
-            return Response({"reply": reply})
+                # Save back to session (limit to last 10 messages)
+                if len(chat_history) > 20:  # 10 user + 10 assistant messages
+                    chat_history = chat_history[-20:]
+
+                request.session["chat_history"] = chat_history
+
+                return Response({"reply": reply})
+
+            except Exception as e:
+                logger.error(f"Error in chat service: {str(e)}")
+                return Response(
+                    {"error": "Service temporarily unavailable"},
+                    status=500
+                )
 
 
 # ====================================================
 # OPTIONAL: Chat History Endpoint (Logged-in Users)
 # ====================================================
-
-from rest_framework.decorators import api_view
-from rest_framework.permissions import IsAuthenticated
-from chatbot.models import ChatMessage
 
 
 @api_view(['GET'])
@@ -109,7 +153,8 @@ def chat_history(request):
     if not request.user.is_authenticated:
         return Response({"error": "Login required"}, status=401)
 
-    messages = ChatMessage.objects.filter(user=request.user).order_by("created_at")
+    messages = ChatMessage.objects.filter(
+        user=request.user).order_by("created_at")
 
     data = [
         {
